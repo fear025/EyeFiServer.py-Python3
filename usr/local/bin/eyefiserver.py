@@ -26,8 +26,8 @@ import time
 import sys
 import os
 import socket
-import thread
-import StringIO
+import _thread
+import io
 
 import hashlib
 import binascii
@@ -38,16 +38,16 @@ import xml.sax
 from xml.sax.handler import ContentHandler 
 import xml.dom.minidom
 
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-import BaseHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import http.server
 
-import SocketServer
+import socketserver
 
 import logging
 
 #pike
 from datetime import datetime
-import ConfigParser
+import configparser
 
 
 """
@@ -126,12 +126,12 @@ class EyeFiContentHandler(ContentHandler):
         self.extractedElements[elementName] = content
 
 # Implements an EyeFi server
-class EyeFiServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
+class EyeFiServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
   
   def server_bind(self):
 
-    BaseHTTPServer.HTTPServer.server_bind(self)    
+    http.server.HTTPServer.server_bind(self)    
     self.socket.settimeout(None)
     self.run = True
 
@@ -176,7 +176,7 @@ class EyeFiRequestHandler(BaseHTTPRequestHandler):
     
     SOAPAction = ""
     eyeFiLogger.debug("Headers received in GET request:")
-    for headerName in self.headers.keys():
+    for headerName in list(self.headers.keys()):
       for headerValue in self.headers.getheaders(headerName):
         eyeFiLogger.debug(headerName + ": " + headerValue)
         if( headerName == "soapaction"):
@@ -208,7 +208,7 @@ class EyeFiRequestHandler(BaseHTTPRequestHandler):
     # Loop through all the request headers and pick out ones that are relevant    
     
     eyeFiLogger.debug("Headers received in POST request:")
-    for headerName in self.headers.keys():
+    for headerName in list(self.headers.keys()):
       for headerValue in self.headers.getheaders(headerName):
 
         if( headerName == "soapaction"):
@@ -345,7 +345,7 @@ class EyeFiRequestHandler(BaseHTTPRequestHandler):
   def uploadPhoto(self,postData):
     
     # Take the postData string and work with it as if it were a file object
-    postDataInMemoryFile = StringIO.StringIO(postData)
+    postDataInMemoryFile = io.StringIO(postData)
     
     # Get the content-type header which looks something like this
     # content-type: multipart/form-data; boundary=---------------------------02468ace13579bdfcafebabef00d    
@@ -364,7 +364,7 @@ class EyeFiRequestHandler(BaseHTTPRequestHandler):
     
     # Parse the multipart/form-data
     form = cgi.parse_multipart(postDataInMemoryFile, {"boundary":boundary,"content-disposition":self.headers.getheaders('content-disposition')})
-    eyeFiLogger.debug("Available multipart/form-data: " + str(form.keys()))
+    eyeFiLogger.debug("Available multipart/form-data: " + str(list(form.keys())))
     
     # Parse the SOAPENVELOPE using the EyeFiContentHandler()
     soapEnvelope = form['SOAPENVELOPE'][0]
@@ -550,13 +550,13 @@ class EyeFiRequestHandler(BaseHTTPRequestHandler):
 def main():
   
   if len(sys.argv) < 2:
-        print "usage: %s configfile logfile" % os.path.basename(sys.argv[0])
+        print("usage: %s configfile logfile" % os.path.basename(sys.argv[0]))
         sys.exit(2)
 
   configfile = sys.argv[1]
   eyeFiLogger.info("Reading config " + configfile)
 
-  config = ConfigParser.SafeConfigParser()
+  config = configparser.ConfigParser()
   config.read(configfile)
   
   # open file logging
